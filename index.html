@@ -1,0 +1,1204 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Little Taiwanese - 小台灣元素合成器</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.05);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.15);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(0, 0, 0, 0.25);
+    }
+    
+    /* Grid Pattern Background */
+    .grid-bg {
+      background-size: 30px 30px;
+      background-image: 
+        linear-gradient(to right, rgba(0, 0, 0, 0.02) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(0, 0, 0, 0.02) 1px, transparent 1px);
+    }
+    
+    .dark .grid-bg {
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    }
+
+    /* Element pulsing animation on creation */
+    @keyframes pop {
+      0% { transform: scale(0.8); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .element-pop {
+      animation: pop 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+
+    /* Prevent text selection when dragging */
+    .no-select {
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    /* Custom classes for mobile 55% / 45% vertical split layout exactly */
+    @media (max-width: 640px) {
+      .mobile-canvas {
+        height: 55% !important;
+        flex: none !important;
+      }
+      .mobile-elements {
+        height: 45% !important;
+        flex: none !important;
+      }
+    }
+  </style>
+</head>
+<body class="bg-stone-100 text-stone-800 dark:bg-stone-900 dark:text-stone-100 h-screen w-screen overflow-hidden flex flex-col no-select transition-colors duration-300">
+
+  <header class="bg-white dark:bg-stone-800 border-b border-stone-200 dark:border-stone-700 px-3 py-2 sm:px-4 sm:py-3 flex items-center justify-between z-10 shrink-0">
+    <div class="flex items-center gap-2 sm:gap-3">
+      <!-- 經典台灣茄芷袋配色小 Icon -->
+      <div class="flex h-7 w-9 sm:h-8 sm:w-10 rounded overflow-hidden shadow-sm border border-stone-300/40 shrink-0">
+        <div class="w-1/3 bg-emerald-600"></div>
+        <div class="w-1/3 bg-red-500"></div>
+        <div class="w-1/3 bg-blue-600"></div>
+      </div>
+      <div>
+        <h1 class="text-base sm:text-xl font-black tracking-wider text-stone-800 dark:text-white flex items-center gap-1">
+          Little Taiwanese
+        </h1>
+      </div>
+    </div>
+    
+    <div class="flex items-center gap-1 sm:gap-2">
+      <!-- 進度顯示 -->
+      <div class="flex flex-col items-end mr-1 sm:mr-2">
+        <span class="text-[9px] sm:text-xs font-bold text-stone-500 dark:text-stone-400">探索進度</span>
+        <span class="text-xs sm:text-sm font-black text-stone-900 dark:text-stone-100" id="progress-text">4 / 80 (5%)</span>
+      </div>
+      
+      <!-- 功能按鈕 -->
+      <button id="btn-save" class="p-1.5 sm:p-2 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 transition-colors" title="存檔與金鑰管理">
+        <i data-lucide="save" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+      </button>
+      <button id="btn-info" class="p-1.5 sm:p-2 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 transition-colors" title="遊戲說明與配方譜">
+        <i data-lucide="book-open" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+      </button>
+      <button id="btn-clear" class="p-1.5 sm:p-2 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 transition-colors" title="清空畫布">
+        <i data-lucide="trash-2" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Progress Bar Mobile -->
+  <div class="bg-stone-200 dark:bg-stone-800 h-1 w-full shrink-0">
+    <div id="progress-bar-mobile" class="bg-stone-900 dark:bg-stone-100 h-full transition-all duration-300" style="width: 5%"></div>
+  </div>
+
+  <!-- Game Container (Desktop: Row, Mobile: Column) -->
+  <div class="flex-1 flex flex-col sm:flex-row overflow-hidden relative">
+    
+    <!-- Left/Top Workspace (Canvas) -->
+    <div id="workspace" class="mobile-canvas sm:flex-1 sm:h-full relative grid-bg overflow-hidden cursor-crosshair bg-stone-50 dark:bg-stone-950">
+      <!-- Drag & Drop Hint -->
+      <div id="workspace-hint" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-stone-400 dark:text-stone-600 transition-opacity duration-300 p-4 text-center">
+        <i data-lucide="sparkles" class="w-8 h-8 sm:w-12 sm:h-12 mb-2 stroke-[1.5]"></i>
+        <p class="font-bold text-xs sm:text-sm">點擊下方元素或拖曳到這裡開始合成</p>
+        <p class="text-[10px] sm:text-xs mt-1 opacity-80">重疊畫布上的兩個元素進行合成，雙擊可將其清除</p>
+      </div>
+    </div>
+
+    <!-- Right/Bottom Sidebar (Elements List) -->
+    <aside class="mobile-elements w-full sm:w-72 md:w-80 sm:h-full border-t sm:border-t-0 sm:border-l border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 flex flex-col shrink-0 z-10 shadow-lg">
+      <!-- Search & Categories -->
+      <div class="p-2 sm:p-3 border-b border-stone-200 dark:border-stone-800 space-y-1.5 sm:space-y-2 shrink-0 bg-stone-50/50 dark:bg-stone-900/50">
+        <div class="relative">
+          <span class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-stone-400">
+            <i data-lucide="search" class="w-3.5 h-3.5"></i>
+          </span>
+          <input type="text" id="search-input" placeholder="搜尋已解鎖元素..." class="w-full pl-8 pr-3 py-1 text-xs sm:text-sm rounded-lg border border-stone-300 dark:border-stone-750 bg-stone-50 dark:bg-stone-800 focus:outline-none focus:ring-1 focus:ring-stone-400 text-stone-800 dark:text-white">
+        </div>
+        
+        <!-- Category Filter Buttons -->
+        <div class="flex gap-1 overflow-x-auto py-0.5 text-[10px] sm:text-xs no-scrollbar">
+          <button class="filter-btn active px-2 py-0.5 sm:py-1 rounded-full bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 font-bold shrink-0" data-category="all">全部</button>
+          <button class="filter-btn px-2 py-0.5 sm:py-1 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-600 dark:bg-stone-800 dark:hover:bg-stone-750 dark:text-stone-400 shrink-0" data-category="basic">自然</button>
+          <button class="filter-btn px-2 py-0.5 sm:py-1 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-600 dark:bg-stone-800 dark:hover:bg-stone-750 dark:text-stone-400 shrink-0" data-category="food">美食</button>
+          <button class="filter-btn px-2 py-0.5 sm:py-1 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-600 dark:bg-stone-800 dark:hover:bg-stone-750 dark:text-stone-400 shrink-0" data-category="culture">風俗</button>
+          <button class="filter-btn px-2 py-0.5 sm:py-1 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-600 dark:bg-stone-800 dark:hover:bg-stone-750 dark:text-stone-400 shrink-0" data-category="life">生活</button>
+        </div>
+      </div>
+
+      <!-- Elements List Container -->
+      <div id="elements-list" class="flex-1 overflow-y-auto p-2 grid grid-cols-3 xs:grid-cols-4 sm:grid-cols-2 gap-1.5 content-start">
+        <!-- Elements injected here -->
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- Notification Toast -->
+  <div id="toast" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-stone-900 text-white dark:bg-white dark:text-stone-950 px-3 py-2 sm:px-4 sm:py-3 rounded-xl shadow-2xl flex items-center gap-2 sm:gap-3 z-50 pointer-events-none opacity-0 translate-y-4 transition-all duration-300 max-w-[90%] border border-stone-800 dark:border-stone-200">
+    <div class="p-1 bg-stone-850 dark:bg-stone-150 rounded-lg text-white dark:text-stone-900 shrink-0">
+      <i data-lucide="sparkle" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+    </div>
+    <div class="min-w-0">
+      <p class="text-[10px] text-stone-400 dark:text-stone-500 font-bold uppercase tracking-wider">發現新合成！</p>
+      <p id="toast-message" class="text-xs sm:text-sm font-bold truncate">解鎖新物種</p>
+    </div>
+  </div>
+
+  <!-- Save Manager Modal -->
+  <div id="save-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white dark:bg-stone-900 rounded-2xl max-w-md w-full p-4 sm:p-5 shadow-2xl border border-stone-200 dark:border-stone-800 transform scale-95 transition-transform flex flex-col max-h-[85vh]">
+      <div class="flex justify-between items-start border-b border-stone-200 dark:border-stone-800 pb-2 mb-3">
+        <h3 class="text-sm sm:text-base font-black text-stone-900 dark:text-white flex items-center gap-1.5">
+          <i data-lucide="save" class="text-stone-900 dark:text-stone-100 w-4.5 h-4.5"></i> 存檔與金鑰管理
+        </h3>
+        <button id="btn-close-save" class="p-1 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-400">
+          <i data-lucide="x" class="w-4.5 h-4.5"></i>
+        </button>
+      </div>
+
+      <!-- Slots Container -->
+      <div class="space-y-3 overflow-y-auto pr-1 flex-1">
+        <p class="text-[10px] sm:text-xs text-stone-500 dark:text-stone-400 leading-relaxed">提供三個獨立儲存空間，可隨時切換或重設進度：</p>
+        <div id="slots-list" class="space-y-2">
+          <!-- Populated dynamically -->
+        </div>
+
+        <div class="border-t border-stone-200 dark:border-stone-800 my-3 pt-3">
+          <h4 class="text-[10px] sm:text-xs font-black text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">進度備份金鑰</h4>
+          <p class="text-[10px] text-stone-500 dark:text-stone-400 mb-2 leading-relaxed">
+            複製下方金鑰，在其他裝置貼上金鑰即可瞬間同步與轉移進度！
+          </p>
+          
+          <div class="space-y-2">
+            <div>
+              <label class="block text-[9px] font-bold text-stone-500 dark:text-stone-400 mb-0.5">匯出金鑰 (當前進度)：</label>
+              <div class="flex gap-1">
+                <input type="text" id="export-key-input" readonly class="flex-1 px-2 py-1 text-[10px] rounded border border-stone-300 dark:border-stone-750 bg-stone-50 dark:bg-stone-950 font-mono text-stone-500" />
+                <button id="btn-copy-key" class="px-2 py-1 bg-stone-200 hover:bg-stone-300 dark:bg-stone-800 dark:hover:bg-stone-700 rounded text-[10px] font-bold shrink-0 text-stone-800 dark:text-stone-200">
+                  複製
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-[9px] font-bold text-stone-500 dark:text-stone-400 mb-0.5">匯入外部金鑰：</label>
+              <div class="flex gap-1">
+                <input type="text" id="import-key-input" placeholder="在此貼上您的金鑰代碼..." class="flex-1 px-2 py-1 text-[10px] rounded border border-stone-300 dark:border-stone-750 bg-white dark:bg-stone-950 font-mono text-stone-800 dark:text-white" />
+                <button id="btn-import-key" class="px-2 py-1 bg-stone-900 hover:bg-stone-850 dark:bg-stone-100 dark:hover:bg-stone-200 text-white dark:text-stone-900 rounded text-[10px] font-bold shrink-0">
+                  匯入
+                </button>
+              </div>
+              <p id="import-error-msg" class="text-[9px] text-red-500 mt-0.5 hidden">金鑰格式不符，請重新確認！</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Info / Recipe Book Modal -->
+  <div id="info-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white dark:bg-stone-900 rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col p-4 sm:p-5 shadow-2xl border border-stone-200 dark:border-stone-800">
+      <div class="flex justify-between items-start border-b border-stone-200 dark:border-stone-800 pb-2.5 shrink-0">
+        <div>
+          <h3 class="text-sm sm:text-base font-black text-stone-900 dark:text-white flex items-center gap-1">
+            Little Taiwanese 探索圖鑑
+          </h3>
+          <p class="text-[9px] sm:text-xs text-stone-500 dark:text-stone-400 mt-0.5">用大自然的基本元素，碰撞出最道地的寶島人情風貌！</p>
+        </div>
+        <button id="btn-close-info" class="p-1 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-400">
+          <i data-lucide="x" class="w-4.5 h-4.5"></i>
+        </button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto py-2.5 space-y-3.5 text-xs sm:text-sm leading-relaxed text-stone-700 dark:text-stone-300">
+        <!-- How to play -->
+        <div>
+          <h4 class="font-bold text-stone-900 dark:text-white border-l-4 border-stone-900 dark:border-stone-100 pl-2 mb-1">手機與電腦探索技巧</h4>
+          <ul class="list-disc list-inside space-y-0.5 pl-1 text-[10px] sm:text-xs">
+            <li>電腦玩家可以直接把元素<span class="font-semibold text-stone-900 dark:text-white">拖曳</span>到畫布。</li>
+            <li>手機玩家直接<span class="font-semibold text-stone-900 dark:text-white">輕點</span>下方元素即可一鍵生成到中央！</li>
+            <li>把畫布上的兩個元素<span class="font-semibold text-stone-900 dark:text-white">疊放</span>，如果可以相融，就會合併出全新元素。</li>
+            <li><span class="font-semibold text-stone-900 dark:text-white">雙擊 (Double Click)</span> 畫布上的任意元素可直接清除。</li>
+          </ul>
+        </div>
+
+        <!-- Achievement hints / unlocked elements list -->
+        <div>
+          <div class="flex justify-between items-center mb-1.5">
+            <h4 class="font-bold text-stone-900 dark:text-white border-l-4 border-stone-900 dark:border-stone-100 pl-2">已解鎖配方與圖鑑</h4>
+            <span class="text-[9px] sm:text-xs bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 px-2 py-0.5 rounded-full font-bold" id="modal-unlocked-count">0 / 80</span>
+          </div>
+          
+          <div id="recipe-list" class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-56 overflow-y-auto p-1">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const AudioEngine = {
+      ctx: null,
+      init() {
+        if (!this.ctx) {
+          this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+      },
+      playPop() {
+        this.init();
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(320, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(850, this.ctx.currentTime + 0.12);
+        gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.12);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.12);
+      },
+      playCombine() {
+        this.init();
+        if (!this.ctx) return;
+        const osc1 = this.ctx.createOscillator();
+        const osc2 = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc1.type = 'triangle';
+        osc1.frequency.setValueAtTime(450, this.ctx.currentTime);
+        osc1.frequency.setValueAtTime(650, this.ctx.currentTime + 0.08);
+        osc1.frequency.setValueAtTime(1000, this.ctx.currentTime + 0.15);
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(220, this.ctx.currentTime);
+        osc2.frequency.exponentialRampToValueAtTime(120, this.ctx.currentTime + 0.25);
+        gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
+        osc1.start();
+        osc2.start();
+        osc1.stop(this.ctx.currentTime + 0.25);
+        osc2.stop(this.ctx.currentTime + 0.25);
+      },
+      playFail() {
+        this.init();
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(140, this.ctx.currentTime);
+        osc.frequency.linearRampToValueAtTime(90, this.ctx.currentTime + 0.18);
+        gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.2);
+      }
+    };
+
+    // 一共包含精確的 80 個極具台灣本土代表性與合成趣味的元素數據與合成表
+    const ALL_ELEMENTS = {
+      // 4 個基礎元素
+      "sun": { name: "陽光", emoji: "☀️", category: "basic", desc: "和煦的陽光，照耀溫暖的南方之島。" },
+      "rain": { name: "雨水", emoji: "🌧️", category: "basic", desc: "豐沛的梅雨與季風，滋潤著大地。" },
+      "wind": { name: "海風", emoji: "💨", category: "basic", desc: "吹拂過蔚藍海岸的太平洋風。鹹鹹的。" },
+      "earth": { name: "泥土", emoji: "🌱", category: "basic", desc: "肥沃、孕育萬物生命的大地泥土。" },
+
+      // 自然類與進階材料
+      "stone": { name: "石頭", emoji: "🪨", category: "basic", desc: "大自然風化而來的堅硬岩石。" },
+      "wood": { name: "木材", emoji: "🪵", category: "basic", desc: "森林樹木砍伐下來的天然木料。" },
+      "ocean": { name: "海洋", emoji: "🌊", category: "basic", desc: "環繞著台灣島嶼的蔚藍太平洋與台灣海峽。" },
+      "mountain": { name: "高山", emoji: "⛰️", category: "basic", desc: "板塊擠壓產生的雄偉山脈，如中央山脈。" },
+      "forest": { name: "森林", emoji: "🌳", category: "basic", desc: "寶島茂密的山地原始針葉林與闊葉林。" },
+      "cloud": { name: "雲朵", emoji: "☁️", category: "basic", desc: "海上上升的水蒸氣凝聚在一起。" },
+      "rainbow": { name: "彩虹", emoji: "🌈", category: "basic", desc: "雨過天晴後的絢麗彩帶。" },
+      "fire": { name: "火焰", emoji: "🔥", category: "basic", desc: "陽光或摩擦引燃的熊熊能量。" },
+      "clay": { name: "黏土", emoji: "🧱", category: "basic", desc: "可以捏塑各種器皿的好塑性土壤。" },
+      "sand": { name: "沙子", emoji: "⛱️", category: "basic", desc: "在墾丁或福隆美麗海灘上的細碎晶體。" },
+      "glass": { name: "玻璃", emoji: "🥛", category: "basic", desc: "沙子經過高熱淬煉而成的通透物體。" },
+      "plant": { name: "植物", emoji: "🌿", category: "basic", desc: "島上生意盎然的各種奇珍異草。" },
+      "metal": { name: "金屬", emoji: "⛓️", category: "basic", desc: "高溫煉化礦物而得的堅固金屬。" },
+      "oil": { name: "石油", emoji: "🛢️", category: "basic", desc: "大地深處埋藏的黑色液體黃金。" },
+      "paper": { name: "紙張", emoji: "📄", category: "life", desc: "木頭纖維經過加工壓制而成的書寫載體。" },
+      "plastic": { name: "塑膠", emoji: "🛍️", category: "life", desc: "石油副產品，現代萬用生活材質。" },
+
+      // 食物與農產品類
+      "rice": { name: "稻米", emoji: "🌾", category: "food", desc: "台灣人的主食，好吃的池上米與關山米！" },
+      "sweet_potato": { name: "地瓜", emoji: "🍠", category: "food", desc: "外形就像台灣本身一樣！代表著台灣人堅韌的生命力。" },
+      "taro": { name: "芋頭", emoji: "🥔", category: "food", desc: "鬆軟綿密的大甲芋頭，甜鹹皆宜。" },
+      "tea_leaves": { name: "茶葉", emoji: "🍃", category: "food", desc: "聞名世界的台灣凍頂烏龍與日月潭紅茶。" },
+      "sugar": { name: "蔗糖", emoji: "🍬", category: "food", desc: "甘蔗壓榨出的香甜，早年台南糖業的繁華基石。" },
+      "milk": { name: "鮮乳", emoji: "🥛", category: "food", desc: "在地牧場生產，濃郁醇香的鮮奶。" },
+      "pork": { name: "豬肉", emoji: "🐷", category: "food", desc: "台灣最廣泛食用的鮮美肉類，如著名的台灣黑豬。" },
+      "cow": { name: "黃牛", emoji: "🐂", category: "life", desc: "在田野間默默辛勤耕作的台灣精神代表。" },
+      "charcoal": { name: "木炭", emoji: "🪵", category: "life", desc: "木頭碳化後的深黑固體，烤肉必備。" },
+      "boba": { name: "珍珠", emoji: "⚫", category: "food", desc: "地瓜粉揉捏成的一顆顆黑色Q彈珍珠粉圓。" },
+      "bubble_tea": { name: "珍珠奶茶", emoji: "🧋", category: "food", desc: "台灣最具世界影響力的飲品代名詞！半糖去冰一千cc！" },
+      "taro_balls": { name: "九份芋圓", emoji: "🍧", category: "food", desc: "九份最經典的手作地瓜圓與芋圓甜湯！" },
+      "shaved_ice": { name: "刨冰", emoji: "🍧", category: "food", desc: "盛夏裡救贖無數人的黑糖刨冰。" },
+      "mango": { name: "芒果", emoji: "🥭", category: "food", desc: "香甜多汁、代表台灣夏天的水果王者。" },
+      "pineapple": { name: "鳳梨", emoji: "🍍", category: "food", desc: "陽光充足下結出金黃酸甜的熱帶水果旺來。" },
+      "pineapple_cake": { name: "鳳梨酥", emoji: "🥮", category: "food", desc: "外皮酥脆內餡酸甜，台灣最具人氣的伴手禮。" },
+      "mango_shaved_ice": { name: "芒果冰", emoji: "🍧", category: "food", desc: "冰涼刨冰淋上滿滿金黃芒果與煉乳，觀光客最愛！" },
+      "rice_wine": { name: "紅標米酒", emoji: "🍶", category: "life", desc: "三杯雞、薑母鴨去腥提味的萬能料理靈魂。" },
+      "stinky_tofu": { name: "臭豆腐", emoji: "🧆", category: "food", desc: "外酥內嫩，聞著臭吃著香的經典庶民小吃。" },
+      "beef_noodles": { name: "牛肉麵", emoji: "🍜", category: "food", desc: "經典紅燒與清燉，台灣極致的麵食驕傲。" },
+      "chicken_cutlet": { name: "大雞排", emoji: "🍗", category: "food", desc: "比臉還要大的酥脆炸雞排，夜市香氣殺手！" },
+      "oyster_omelet": { name: "蚵仔煎", emoji: "🍳", category: "food", desc: "新鮮蚵仔搭配太白粉芡水與獨門甜辣醬的絕配。" },
+      "xiaolongbao": { name: "小籠包", emoji: "🥟", category: "food", desc: "皮薄、餡多、湯汁濃郁的米其林殿堂級美味。" },
+      "soy_milk": { name: "豆漿", emoji: "🥛", category: "food", desc: "搭配油條、燒餅享用的傳統台灣早餐標配。" },
+      "youtiao": { name: "油條", emoji: "🥖", category: "food", desc: "金黃酥脆的油炸麵食，撕開配豆漿極讚。" },
+      "guabao": { name: "刈包", emoji: "🍔", category: "food", desc: "夾著焢肉、酸菜與花生粉的「台灣漢堡」！" },
+      "aiyu": { name: "愛玉冰", emoji: "🍋", category: "food", desc: "野生愛玉子手搓揉製出的透涼凍凍甜品。" },
+      "betel_nut": { name: "檳榔", emoji: "🌿", category: "life", desc: "俗稱台灣口香糖，具強烈提神效果的歷史果實。" },
+
+      // 生活風情與其他
+      "slippers": { name: "藍白拖", emoji: "🩴", category: "life", desc: "超強韌性、萬能防滑，台灣人的草根時尚聖物。" },
+      "scooter": { name: "機車", emoji: "🛵", category: "life", desc: "大街小巷穿梭、人手一台的靈活代步交通工具。" },
+      "scooter_waterfall": { name: "機車瀑布", emoji: "🏍️", category: "life", desc: "台北大橋上下班尖峰時刻的世界級壯觀摩托車景致！" },
+      "garbage_truck": { name: "垃圾車", emoji: "🚛", category: "life", desc: "經典少女的祈禱響起！拎著垃圾袋追車是台灣專屬默契。" },
+      "electric_pot": { name: "大同電鍋", emoji: "🍲", category: "life", desc: "綠色外殼，陪伴幾代人出國與生活，保溫神廚！" },
+      "easy_card": { name: "悠遊卡", emoji: "💳", category: "life", desc: "嗶一聲暢行大眾運輸與超商付款的萬能小卡。" },
+      "convenience_store": { name: "24H超商", emoji: "🏪", category: "life", desc: "全台密度極高，不論多晚都能解決生活大小事的深夜明燈。" },
+      "ubike": { name: "Ubike", emoji: "🚲", category: "life", desc: "遍佈城市的黃綠色公共自行車，減碳通勤首選。" },
+      "work": { name: "上班打卡", emoji: "🏢", category: "life", desc: "辛勤努力的寶島上班族、工程師拼搏日常。" },
+      "typhoon": { name: "颱風", emoji: "🌀", category: "basic", desc: "夏秋之際常見、考驗水庫防洪的強烈熱帶氣旋。" },
+      "typhoon_holiday": { name: "颱風假", emoji: "🎉", category: "life", desc: "全體台灣人在大風大雨日最期盼的「小確幸」！" },
+      "night_market": { name: "台灣夜市", emoji: "🏮", category: "life", desc: "匯聚宮廟、美食與人潮的夜生活精華代名詞！" },
+      "bear": { name: "台灣黑熊", emoji: "🐻", category: "basic", desc: "胸前有著白色 V 字領的台灣特有種保育類明星。" },
+      "leopard_cat": { name: "石虎", emoji: "🐱", category: "basic", desc: "分佈於苗栗淺山地區、瀕臨絕種的珍貴貓科動物。" },
+      "sika_deer": { name: "梅花鹿", emoji: "🦌", category: "basic", desc: "身上點綴美麗白斑，重返墾丁野地的溫馴明星。" },
+      "hot_spring": { name: "溫泉", emoji: "♨️", category: "basic", desc: "北投、礁溪著名的地熱硫磺泉，冷冬裡的極致享受。" },
+      "jade_mountain": { name: "玉山", emoji: "🏔️", category: "basic", desc: "東北亞第一高峰！氣勢磅礴，台灣五大山脈之首。" },
+      "sun_moon_lake": { name: "日月潭", emoji: "🏞️", category: "basic", desc: "群山環抱、潭水澄澈的台灣經典國際級湖景。" },
+      "taipei_101": { name: "台北101", emoji: "🗼", category: "life", desc: "曾為世界最高大樓，跨年煙火匯聚全球焦點。" },
+      "alishan_train": { name: "阿里山火車", emoji: "🚂", category: "life", desc: "穿梭在森林與櫻花間的百年窄軌登山鐵路。" },
+
+      // 民俗與文化
+      "statue": { name: "神像", emoji: "🪵", category: "culture", desc: "用木頭雕刻而成、散發威嚴的神明金身。" },
+      "fireworks": { name: "鞭炮煙火", emoji: "🎆", category: "culture", desc: "迎神賽會不可或缺，驅邪除穢、喜氣洋洋。" },
+      "mazu": { name: "媽祖娘娘", emoji: "👸", category: "culture", desc: "台灣最溫暖慈祥的守護女神，三月大甲媽遶境萬人空巷！" },
+      "temple": { name: "宮廟", emoji: "⛩️", category: "culture", desc: "紅磚飛簷、雕樑畫棟，是信仰中心也是常民社交場所。" },
+      "joss_paper": { name: "金紙", emoji: "💵", category: "culture", desc: "燒給神明或祖先以表敬意與祝福的特殊紙張。" },
+      "ghost_festival": { name: "中元普渡", emoji: "👻", category: "culture", desc: "農曆七月，準備澎湃供品款待四方好兄弟的慈悲傳統。" },
+      "glove_puppetry": { name: "布袋戲", emoji: "🎭", category: "culture", desc: "「口白一口道出千古事」的掌中傳統偶戲經典。" },
+      "lantern_festival": { name: "平溪天燈", emoji: "🏮", category: "culture", desc: "在夜色中緩緩升起、承載無數心願的紅色天燈。" },
+      "dragon_boat": { name: "划龍舟", emoji: "🛶", category: "culture", desc: "端午佳節在河道上奮力擊鼓奪旗的熱血競速。" },
+      "moon_festival": { name: "中秋烤肉", emoji: "🎑", category: "culture", desc: "「一家烤肉萬家香」，台灣特有的中秋闔家團聚儀式。" },
+      "red_envelope": { name: "壓歲紅包", emoji: "🧧", category: "culture", desc: "除夕夜長輩對晚輩最期待的吉祥紅包，歲歲平安！" },
+      "taiwan_opera": { name: "歌仔戲", emoji: "🎤", category: "culture", desc: "廟埕前鑼鼓喧天，以台語演唱的本土傳統大戲戲曲。" }
+    };
+
+    // --- STREAMING_CHUNK: Recipe Maps ---
+    const RECIPES = {
+      // 1階自然合成
+      "earth+earth": "stone",
+      "earth+rain": "clay",
+      "earth+sun": "rice",
+      "earth+wind": "sand",
+      "rain+sun": "rainbow",
+      "rain+wind": "cloud",
+      "cloud+earth": "plant",
+      "plant+earth": "wood",
+      "rain+rain": "ocean",
+      "earth+stone": "mountain",
+      "plant+plant": "forest",
+      "sand+sun": "glass",
+      "sun+wood": "fire",
+      "stone+fire": "metal",
+      "earth+plant": "oil",
+      
+      // 2階合成與基礎材料
+      "rain+wood": "paper",
+      "fire+oil": "plastic",
+      "rain+rice": "rice_wine",
+      "earth+rice": "sweet_potato",
+      "earth+sweet_potato": "taro",
+      "plant+wind": "tea_leaves",
+      "plant+sun": "sugar",
+      "wood+fire": "charcoal",
+      "clay+wood": "statue",
+      "charcoal+metal": "fireworks",
+      "clay+metal": "temple",
+      "paper+sun": "joss_paper",
+      "cow+rain": "milk",
+      "earth+rice_wine": "pork",
+      "earth+rice+sun": "cow",
+
+      // 美食系列
+      "sugar+sweet_potato": "boba",
+      "boba+milk": "bubble_tea",
+      "milk+tea_leaves": "bubble_tea",
+      "sweet_potato+taro": "taro_balls",
+      "rain+sand": "shaved_ice",
+      "pineapple+sun": "mango",
+      "plant+sun+wind": "pineapple",
+      "pineapple+rice": "pineapple_cake",
+      "mango+shaved_ice": "mango_shaved_ice",
+      "clay+plant": "stinky_tofu",
+      "cow+rice": "beef_noodles",
+      "oil+pork": "chicken_cutlet",
+      "ocean+pork": "oyster_omelet",
+      "paper+pork": "xiaolongbao",
+      "milk+plant": "soy_milk",
+      "oil+rice": "youtiao",
+      "pork+sugar": "guabao",
+      "plant+shaved_ice": "aiyu",
+      "plant+fire": "betel_nut",
+
+      // 生活寫照與交通
+      "plastic+clay": "slippers",
+      "metal+oil": "scooter",
+      "scooter+scooter": "scooter_waterfall",
+      "scooter+wind": "garbage_truck",
+      "glass+metal": "electric_pot",
+      "metal+plastic": "easy_card",
+      "easy_card+work": "convenience_store",
+      "plant+scooter": "ubike",
+      "earth+metal": "work",
+      "typhoon+work": "typhoon_holiday",
+      "rain+wind+work": "typhoon",
+      "stinky_tofu+temple": "night_market",
+      "bubble_tea+stinky_tofu": "night_market",
+
+      // 自然景緻與動物
+      "forest+mountain": "bear",
+      "forest+stone": "leopard_cat",
+      "cow+forest": "sika_deer",
+      "stone+fire+rain": "hot_spring",
+      "mountain+rainbow": "jade_mountain",
+      "mountain+ocean": "sun_moon_lake",
+      "glass+metal+work": "taipei_101",
+      "forest+metal": "alishan_train",
+
+      // 民俗文化
+      "fireworks+statue": "mazu",
+      "joss_paper+temple": "ghost_festival",
+      "paper+wood": "glove_puppetry",
+      "fire+paper": "lantern_festival",
+      "ocean+wood": "dragon_boat",
+      "charcoal+pork": "moon_festival",
+      "paper+sugar": "red_envelope",
+      "glove_puppetry+temple": "taiwan_opera"
+    };
+
+    const EXTENDED_RECIPES = {
+      "wind+rain": "typhoon",
+      "fire+earth": "metal",
+      "tea_leaves+milk": "bubble_tea",
+      "cow+earth": "milk",
+      "fireworks+temple": "mazu",
+      "easy_card+night_market": "convenience_store",
+      "scooter+temple": "garbage_truck"
+    };
+
+    const COMBINE_MAP = { ...RECIPES, ...EXTENDED_RECIPES };
+
+    // --- STREAMING_CHUNK: State Variables ---
+    let activeSlot = 1;
+    let unlockedElements = ["sun", "rain", "wind", "earth"];
+    let workspaceElements = [];
+    let elementIdCounter = 0;
+    let dragElement = null;
+    let activeCategory = "all";
+
+    // --- DOM Selections ---
+    const workspace = document.getElementById("workspace");
+    const elementsList = document.getElementById("elements-list");
+    const searchInput = document.getElementById("search-input");
+    const filterButtons = document.querySelectorAll(".filter-btn");
+    const progressText = document.getElementById("progress-text");
+    const progressBarMobile = document.getElementById("progress-bar-mobile");
+    const toast = document.getElementById("toast");
+    const toastMessage = document.getElementById("toast-message");
+    const workspaceHint = document.getElementById("workspace-hint");
+
+    // Modals DOM
+    const btnSave = document.getElementById("btn-save");
+    const saveModal = document.getElementById("save-modal");
+    const btnCloseSave = document.getElementById("btn-close-save");
+    const slotsList = document.getElementById("slots-list");
+    
+    const exportKeyInput = document.getElementById("export-key-input");
+    const btnCopyKey = document.getElementById("btn-copy-key");
+    const importKeyInput = document.getElementById("import-key-input");
+    const btnImportKey = document.getElementById("btn-import-key");
+    const importErrorMsg = document.getElementById("import-error-msg");
+
+    const btnInfo = document.getElementById("btn-info");
+    const infoModal = document.getElementById("info-modal");
+    const btnCloseInfo = document.getElementById("btn-close-info");
+    const recipeListContainer = document.getElementById("recipe-list");
+    const modalUnlockedCount = document.getElementById("modal-unlocked-count");
+
+    const btnClear = document.getElementById("btn-clear");
+
+    // --- STREAMING_CHUNK: Storage and Key Serialization ---
+    function loadProgress() {
+      const active = localStorage.getItem("little_taiwanese_active_slot");
+      if (active) {
+        activeSlot = parseInt(active, 10);
+      }
+
+      const saved = localStorage.getItem(`little_taiwanese_slot_${activeSlot}`);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length >= 4) {
+            unlockedElements = parsed;
+          } else {
+            unlockedElements = ["sun", "rain", "wind", "earth"];
+          }
+        } catch (e) {
+          unlockedElements = ["sun", "rain", "wind", "earth"];
+        }
+      } else {
+        unlockedElements = ["sun", "rain", "wind", "earth"];
+      }
+      updateProgressUI();
+      updateExportKey();
+    }
+
+    function saveProgress() {
+      localStorage.setItem(`little_taiwanese_slot_${activeSlot}`, JSON.stringify(unlockedElements));
+      localStorage.setItem("little_taiwanese_active_slot", activeSlot.toString());
+      updateProgressUI();
+      updateExportKey();
+    }
+
+    function updateProgressUI() {
+      const total = Object.keys(ALL_ELEMENTS).length;
+      const count = unlockedElements.length;
+      const percentage = Math.round((count / total) * 100);
+      
+      const text = `${count} / ${total} (${percentage}%)`;
+      progressText.textContent = text;
+      progressBarMobile.style.width = `${percentage}%`;
+    }
+
+    function updateExportKey() {
+      try {
+        const payload = {
+          v: "80v1",
+          slot: activeSlot,
+          items: unlockedElements
+        };
+        const encoded = btoa(encodeURIComponent(JSON.stringify(payload)));
+        exportKeyInput.value = encoded;
+      } catch (e) {
+        exportKeyInput.value = "";
+      }
+    }
+
+    function importKey(keyStr) {
+      try {
+        const decoded = decodeURIComponent(atob(keyStr.trim()));
+        const parsed = JSON.parse(decoded);
+        if (parsed && Array.isArray(parsed.items)) {
+          const validItems = parsed.items.filter(k => ALL_ELEMENTS[k]);
+          if (validItems.length >= 4) {
+            unlockedElements = validItems;
+            saveProgress();
+            renderSidebarElements();
+            showToastMessage("進度金鑰匯入成功！🎉");
+            importErrorMsg.classList.add("hidden");
+            importKeyInput.value = "";
+            return true;
+          }
+        }
+      } catch (e) {}
+      importErrorMsg.classList.remove("hidden");
+      return false;
+    }
+
+    // --- STREAMING_CHUNK: Sidebar Elements Rendering ---
+    function renderSidebarElements() {
+      elementsList.innerHTML = "";
+      const query = searchInput.value.trim().toLowerCase();
+
+      const sortedUnlocked = [...unlockedElements].sort((a, b) => {
+        return ALL_ELEMENTS[a].name.localeCompare(ALL_ELEMENTS[b].name, 'zh-HanT');
+      });
+
+      let displayedCount = 0;
+
+      sortedUnlocked.forEach(key => {
+        const item = ALL_ELEMENTS[key];
+        if (!item) return;
+
+        if (query && !item.name.includes(query) && !item.desc.includes(query)) {
+          return;
+        }
+
+        if (activeCategory !== "all" && item.category !== activeCategory) {
+          return;
+        }
+
+        displayedCount++;
+
+        const div = document.createElement("div");
+        div.className = "flex flex-col items-center justify-center p-1 sm:p-2 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900 hover:bg-stone-100 dark:hover:bg-stone-800/85 cursor-pointer sm:cursor-grab active:cursor-grabbing transition-all duration-150 relative select-none shadow-sm hover:shadow active:scale-95 group text-center min-w-0";
+        div.setAttribute("draggable", "true");
+        div.setAttribute("data-key", key);
+
+        div.innerHTML = `
+          <span class="text-xl sm:text-2xl mb-0.5 filter drop-shadow-sm pointer-events-none group-hover:scale-110 transition-transform">${item.emoji}</span>
+          <span class="text-[9px] sm:text-xs font-black text-stone-800 dark:text-stone-200 pointer-events-none truncate w-full">${item.name}</span>
+          
+          <div class="hidden sm:block absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-44 bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 text-[10px] p-2 rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-xl leading-normal text-center border border-stone-700 dark:border-stone-300">
+            ${item.desc}
+          </div>
+        `;
+
+        div.addEventListener("click", () => {
+          spawnAtWorkspaceCenter(key);
+        });
+
+        div.addEventListener("dragstart", (e) => {
+          e.dataTransfer.setData("text/plain", key);
+          dragElement = { key: key, isNew: true };
+        });
+
+        elementsList.appendChild(div);
+      });
+
+      if (displayedCount === 0) {
+        elementsList.innerHTML = `
+          <div class="col-span-full text-center py-6 text-stone-400 dark:text-stone-600">
+            <p class="text-[10px] sm:text-xs">找不到解鎖元素</p>
+          </div>
+        `;
+      }
+    }
+
+    // --- STREAMING_CHUNK: Workspace Logic and Touch Adaptations ---
+    function spawnAtWorkspaceCenter(key) {
+      const rect = workspace.getBoundingClientRect();
+      const offsetRange = Math.min(rect.width, rect.height) * 0.15;
+      const x = rect.width / 2 - 45 + (Math.random() - 0.5) * offsetRange;
+      const y = rect.height / 2 - 15 + (Math.random() - 0.5) * offsetRange;
+      spawnElementOnWorkspace(key, x, y);
+    }
+
+    function spawnElementOnWorkspace(key, x, y, animate = true) {
+      const item = ALL_ELEMENTS[key];
+      if (!item) return null;
+
+      const id = ++elementIdCounter;
+      const el = document.createElement("div");
+      el.className = "absolute flex items-center gap-1 px-2 py-0.5 sm:px-2.5 sm:py-1 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-full shadow-md cursor-grab active:cursor-grabbing hover:shadow-lg hover:border-stone-300 dark:hover:border-stone-600 transition-shadow select-none z-10 origin-center no-select shrink-0";
+      if (animate) el.classList.add("element-pop");
+
+      el.innerHTML = `
+        <span class="text-sm sm:text-base pointer-events-none">${item.emoji}</span>
+        <span class="text-[9px] sm:text-xs font-black text-stone-800 dark:text-stone-100 pointer-events-none">${item.name}</span>
+      `;
+
+      el.style.left = `${x}px`;
+      el.style.top = `${y}px`;
+
+      let lastClickTime = 0;
+      let lastTouchTime = 0;
+
+      el.addEventListener("dblclick", () => removeWorkspaceElement(id));
+
+      let isDragging = false;
+      let startX, startY;
+      let elemX, elemY;
+
+      // Mouse drag
+      el.addEventListener("mousedown", (e) => {
+        if (e.button !== 0) return;
+
+        // 雙擊自訂檢測：避免 preventDefault 阻斷瀏覽器原生的 dblclick
+        const currentTime = Date.now();
+        if (currentTime - lastClickTime < 300) {
+          removeWorkspaceElement(id);
+          e.preventDefault();
+          return;
+        }
+        lastClickTime = currentTime;
+
+        isDragging = true;
+        el.style.zIndex = "30";
+        el.style.cursor = "grabbing";
+        
+        startX = e.clientX;
+        startY = e.clientY;
+        
+        const rect = el.getBoundingClientRect();
+        const parentRect = workspace.getBoundingClientRect();
+        elemX = rect.left - parentRect.left;
+        elemY = rect.top - parentRect.top;
+
+        AudioEngine.init();
+
+        const onMouseMove = (moveEvent) => {
+          if (!isDragging) return;
+          const dx = moveEvent.clientX - startX;
+          const dy = moveEvent.clientY - startY;
+          let nextX = elemX + dx;
+          let nextY = elemY + dy;
+
+          const maxW = parentRect.width - rect.width;
+          const maxH = parentRect.height - rect.height;
+          nextX = Math.max(0, Math.min(nextX, maxW));
+          nextY = Math.max(0, Math.min(nextY, maxH));
+
+          el.style.left = `${nextX}px`;
+          el.style.top = `${nextY}px`;
+
+          const wItem = workspaceElements.find(item => item.id === id);
+          if (wItem) {
+            wItem.x = nextX;
+            wItem.y = nextY;
+          }
+        };
+
+        const onMouseUp = () => {
+          if (isDragging) {
+            isDragging = false;
+            el.style.zIndex = "10";
+            el.style.cursor = "grab";
+            document.removeEventListener("mousemove", onMouseMove);
+            document.removeEventListener("mouseup", onMouseUp);
+            checkCollisionAndCombine(id);
+          }
+        };
+
+        document.addEventListener("mousemove", onMouseMove);
+        document.addEventListener("mouseup", onMouseUp);
+        e.preventDefault();
+      });
+
+      // Touch drag
+      el.addEventListener("touchstart", (e) => {
+        // 行動端雙擊 (雙觸碰) 檢測
+        const currentTime = Date.now();
+        if (currentTime - lastTouchTime < 300) {
+          removeWorkspaceElement(id);
+          e.preventDefault();
+          return;
+        }
+        lastTouchTime = currentTime;
+
+        isDragging = true;
+        el.style.zIndex = "30";
+        const touch = e.touches[0];
+        startX = touch.clientX;
+        startY = touch.clientY;
+        
+        const rect = el.getBoundingClientRect();
+        const parentRect = workspace.getBoundingClientRect();
+        elemX = rect.left - parentRect.left;
+        elemY = rect.top - parentRect.top;
+
+        AudioEngine.init();
+
+        const onTouchMove = (moveEvent) => {
+          if (!isDragging) return;
+          const touchMove = moveEvent.touches[0];
+          const dx = touchMove.clientX - startX;
+          const dy = touchMove.clientY - startY;
+          let nextX = elemX + dx;
+          let nextY = elemY + dy;
+
+          const maxW = parentRect.width - rect.width;
+          const maxH = parentRect.height - rect.height;
+          nextX = Math.max(0, Math.min(nextX, maxW));
+          nextY = Math.max(0, Math.min(nextY, maxH));
+
+          el.style.left = `${nextX}px`;
+          el.style.top = `${nextY}px`;
+
+          const wItem = workspaceElements.find(item => item.id === id);
+          if (wItem) {
+            wItem.x = nextX;
+            wItem.y = nextY;
+          }
+        };
+
+        const onTouchEnd = () => {
+          if (isDragging) {
+            isDragging = false;
+            el.style.zIndex = "10";
+            document.removeEventListener("touchmove", onTouchMove);
+            document.removeEventListener("touchend", onTouchEnd);
+            checkCollisionAndCombine(id);
+          }
+        };
+
+        document.addEventListener("touchmove", onTouchMove, { passive: false });
+        document.addEventListener("touchend", onTouchEnd);
+        e.preventDefault();
+      });
+
+      workspace.appendChild(el);
+      workspaceElements.push({ id, elementKey: key, x, y, el });
+      updateWorkspaceHint();
+      return id;
+    }
+
+    function checkCollisionAndCombine(movedId) {
+      const movedItem = workspaceElements.find(item => item.id === movedId);
+      if (!movedItem) return;
+
+      const rect1 = movedItem.el.getBoundingClientRect();
+
+      for (let i = 0; i < workspaceElements.length; i++) {
+        const targetItem = workspaceElements[i];
+        if (targetItem.id === movedId) continue;
+
+        const rect2 = targetItem.el.getBoundingClientRect();
+
+        const isOverlapping = !(rect1.right < rect2.left || 
+                                rect1.left > rect2.right || 
+                                rect1.bottom < rect2.top || 
+                                rect1.top > rect2.bottom);
+
+        if (isOverlapping) {
+          const key1 = movedItem.elementKey;
+          const key2 = targetItem.elementKey;
+          const recipeKey = [key1, key2].sort().join("+");
+          const resultKey = COMBINE_MAP[recipeKey];
+
+          if (resultKey) {
+            const newX = (movedItem.x + targetItem.x) / 2;
+            const newY = (movedItem.y + targetItem.y) / 2;
+
+            removeWorkspaceElement(movedId);
+            removeWorkspaceElement(targetItem.id);
+
+            AudioEngine.playCombine();
+            spawnElementOnWorkspace(resultKey, newX, newY);
+
+            if (!unlockedElements.includes(resultKey)) {
+              unlockedElements.push(resultKey);
+              saveProgress();
+              renderSidebarElements();
+              showToast(resultKey);
+            }
+            return;
+          } else {
+            bounceElements(movedItem.el, targetItem.el);
+            AudioEngine.playFail();
+          }
+        }
+      }
+    }
+
+    function bounceElements(el1, el2) {
+      el1.style.transform = 'scale(1.08)';
+      el2.style.transform = 'scale(1.08)';
+      setTimeout(() => {
+        el1.style.transform = '';
+        el2.style.transform = '';
+      }, 120);
+    }
+
+    function removeWorkspaceElement(id) {
+      const index = workspaceElements.findIndex(item => item.id === id);
+      if (index !== -1) {
+        const item = workspaceElements[index];
+        item.el.style.transform = 'scale(0)';
+        item.el.style.opacity = '0';
+        item.el.style.transition = 'all 0.12s';
+        setTimeout(() => {
+          if (item.el.parentNode === workspace) {
+            workspace.removeChild(item.el);
+          }
+        }, 120);
+        workspaceElements.splice(index, 1);
+        AudioEngine.playPop();
+      }
+      setTimeout(updateWorkspaceHint, 180);
+    }
+
+    function updateWorkspaceHint() {
+      if (workspaceElements.length === 0) {
+        workspaceHint.style.opacity = "1";
+      } else {
+        workspaceHint.style.opacity = "0";
+      }
+    }
+
+    // --- STREAMING_CHUNK: Toast Notification ---
+    let toastTimeout = null;
+    function showToast(elementKey) {
+      const item = ALL_ELEMENTS[elementKey];
+      if (!item) return;
+      showToastMessage(`解鎖了新元素：<strong>${item.name}</strong> ${item.emoji}`);
+    }
+
+    function showToastMessage(htmlMsg) {
+      toastMessage.innerHTML = htmlMsg;
+      clearTimeout(toastTimeout);
+      toast.classList.remove("opacity-0", "translate-y-4");
+      toast.classList.add("opacity-100", "translate-y-0");
+
+      toastTimeout = setTimeout(() => {
+        toast.classList.remove("opacity-100", "translate-y-0");
+        toast.classList.add("opacity-0", "translate-y-4");
+      }, 2500);
+    }
+
+    // --- STREAMING_CHUNK: Save Slots Rendering ---
+    function renderSaveSlots() {
+      slotsList.innerHTML = "";
+      
+      for (let i = 1; i <= 3; i++) {
+        const slotData = localStorage.getItem(`little_taiwanese_slot_${i}`);
+        let count = 4;
+        if (slotData) {
+          try {
+            count = JSON.parse(slotData).length;
+          } catch(e) {}
+        }
+        
+        const isCurrent = activeSlot === i;
+        const div = document.createElement("div");
+        div.className = `p-2 rounded-xl border flex items-center justify-between transition-all ${
+          isCurrent 
+            ? "border-stone-900 dark:border-stone-100 bg-stone-100/50 dark:bg-stone-800/30" 
+            : "border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800"
+        }`;
+        
+        div.innerHTML = `
+          <div class="min-w-0 pr-2">
+            <h5 class="text-xs font-black text-stone-800 dark:text-white flex items-center gap-1.5">
+              存檔 0${i} ${isCurrent ? '<span class="text-[9px] bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 px-1 py-0.1 rounded font-normal">使用中</span>' : ''}
+            </h5>
+            <p class="text-[10px] text-stone-500 dark:text-stone-400 mt-0.5">解鎖: <strong class="text-stone-900 dark:text-stone-100 font-black">${count}</strong> / 80</p>
+          </div>
+          <div class="flex gap-1 shrink-0">
+            ${!isCurrent ? `<button class="btn-load-slot px-2 py-1 text-[9px] font-bold bg-stone-200 hover:bg-stone-300 dark:bg-stone-700 dark:hover:bg-stone-650 rounded text-stone-700 dark:text-stone-200" data-slot="${i}">切換</button>` : ''}
+            <button class="btn-reset-slot px-2 py-1 text-[9px] font-bold bg-stone-100 hover:bg-stone-200 dark:bg-stone-800 dark:hover:bg-stone-750 rounded text-stone-500" data-slot="${i}" data-stage="0">重設</button>
+          </div>
+        `;
+        
+        slotsList.appendChild(div);
+      }
+      
+      document.querySelectorAll(".btn-load-slot").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const targetSlot = parseInt(btn.getAttribute("data-slot"), 10);
+          activeSlot = targetSlot;
+          loadProgress();
+          renderSidebarElements();
+          renderSaveSlots();
+          btnClear.click();
+          showToastMessage(`已切換至存檔 0${targetSlot}`);
+        });
+      });
+
+      document.querySelectorAll(".btn-reset-slot").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const targetSlot = parseInt(btn.getAttribute("data-slot"), 10);
+          const stage = parseInt(btn.getAttribute("data-stage"), 10);
+          if (stage === 0) {
+            btn.setAttribute("data-stage", "1");
+            btn.textContent = "再次點擊確認重設";
+            btn.className = "btn-reset-slot px-2 py-1 text-[9px] font-bold bg-red-600 text-white rounded transition-colors";
+          } else {
+            localStorage.setItem(`little_taiwanese_slot_${targetSlot}`, JSON.stringify(["sun", "rain", "wind", "earth"]));
+            if (activeSlot === targetSlot) {
+              loadProgress();
+              renderSidebarElements();
+              btnClear.click();
+            }
+            renderSaveSlots();
+            showToastMessage(`存檔 0${targetSlot} 已重置為初始起點🌱`);
+          }
+        });
+      });
+    }
+
+    // --- STREAMING_CHUNK: Recipe Book & 圖鑑 UI ---
+    function populateRecipeBook() {
+      recipeListContainer.innerHTML = "";
+      const total = Object.keys(ALL_ELEMENTS).length;
+      modalUnlockedCount.textContent = `${unlockedElements.length} / ${total}`;
+
+      Object.keys(ALL_ELEMENTS).forEach(key => {
+        const item = ALL_ELEMENTS[key];
+        const isUnlocked = unlockedElements.includes(key);
+
+        const card = document.createElement("div");
+        card.className = `p-1.5 sm:p-2 rounded-xl border flex items-center gap-2 transition-colors ${
+          isUnlocked 
+            ? "bg-stone-50 dark:bg-stone-900 border-stone-200 dark:border-stone-800" 
+            : "bg-stone-100/30 dark:bg-stone-950/20 border-stone-200/40 dark:border-stone-900/40 opacity-40 select-none"
+        }`;
+
+        if (isUnlocked) {
+          const foundRecipes = [];
+          Object.entries(COMBINE_MAP).forEach(([formula, result]) => {
+            if (result === key) {
+              const [ing1, ing2] = formula.split("+");
+              if (unlockedElements.includes(ing1) && unlockedElements.includes(ing2)) {
+                foundRecipes.push(`${ALL_ELEMENTS[ing1].emoji} ${ALL_ELEMENTS[ing1].name} + ${ALL_ELEMENTS[ing2].emoji} ${ALL_ELEMENTS[ing2].name}`);
+              }
+            }
+          });
+
+          const recipeDesc = ["sun", "rain", "wind", "earth"].includes(key) 
+            ? `<span class="text-[9px] bg-stone-200 dark:bg-stone-800 text-stone-800 dark:text-stone-200 px-1.5 py-0.2 rounded font-semibold">自然基礎元素</span>`
+            : (foundRecipes.length > 0 ? foundRecipes.map(r => `<p class="text-[9px] text-stone-600 dark:text-stone-400 font-bold">▪ ${r}</p>`).join("") : `<span class="text-[9px] text-stone-400">配方未解鎖</span>`);
+
+          card.innerHTML = `
+            <span class="text-xl sm:text-2xl">${item.emoji}</span>
+            <div class="flex-1 min-w-0">
+              <h5 class="text-xs font-black text-stone-800 dark:text-white">${item.name}</h5>
+              <p class="text-[10px] text-stone-500 dark:text-stone-400 truncate mb-0.5" title="${item.desc}">${item.desc}</p>
+              ${recipeDesc}
+            </div>
+          `;
+        } else {
+          card.innerHTML = `
+            <span class="text-xl sm:text-2xl filter grayscale blur-[1px]">❓</span>
+            <div class="flex-1 min-w-0">
+              <h5 class="text-xs font-bold text-stone-400 dark:text-stone-600">???</h5>
+              <p class="text-[9px] text-stone-400 dark:text-stone-600">尚未探索發現此元素...</p>
+            </div>
+          `;
+        }
+
+        recipeListContainer.appendChild(card);
+      });
+    }
+
+    // --- STREAMING_CHUNK: Filtering & General Events Initialization ---
+    function setupEventListeners() {
+      workspace.addEventListener("dragover", (e) => e.preventDefault());
+      
+      workspace.addEventListener("drop", (e) => {
+        e.preventDefault();
+        const key = e.dataTransfer.getData("text/plain") || (dragElement ? dragElement.key : null);
+        if (!key) return;
+
+        const rect = workspace.getBoundingClientRect();
+        const x = e.clientX - rect.left - 45;
+        const y = e.clientY - rect.top - 15;
+
+        spawnElementOnWorkspace(key, x, y);
+        dragElement = null;
+      });
+
+      workspace.addEventListener("touchend", (e) => {
+        if (dragElement && dragElement.isNew) {
+          const touch = e.changedTouches[0];
+          const rect = workspace.getBoundingClientRect();
+          const x = touch.clientX - rect.left - 45;
+          const y = touch.clientY - rect.top - 15;
+
+          if (x >= 0 && x <= rect.width && y >= 0 && y <= rect.height) {
+            spawnElementOnWorkspace(dragElement.key, x, y);
+          }
+          dragElement = null;
+        }
+      });
+
+      searchInput.addEventListener("input", renderSidebarElements);
+
+      filterButtons.forEach(btn => {
+        btn.addEventListener("click", () => {
+          filterButtons.forEach(b => {
+            b.className = "filter-btn px-2 py-0.5 sm:py-1 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-600 dark:bg-stone-800 dark:hover:bg-stone-750 dark:text-stone-400 shrink-0 transition-all";
+          });
+
+          btn.className = "filter-btn active px-2 py-0.5 sm:py-1 rounded-full bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 font-bold shrink-0 transition-all";
+          activeCategory = btn.getAttribute("data-category");
+          renderSidebarElements();
+        });
+      });
+
+      btnClear.addEventListener("click", () => {
+        workspaceElements.forEach(item => {
+          if (item.el.parentNode === workspace) {
+            workspace.removeChild(item.el);
+          }
+        });
+        workspaceElements = [];
+        updateWorkspaceHint();
+        AudioEngine.playPop();
+      });
+
+      // Save modal functionality
+      btnSave.addEventListener("click", () => {
+        renderSaveSlots();
+        saveModal.classList.remove("hidden");
+      });
+
+      btnCloseSave.addEventListener("click", () => {
+        saveModal.classList.add("hidden");
+      });
+
+      // Copy Key
+      btnCopyKey.addEventListener("click", () => {
+        exportKeyInput.select();
+        document.execCommand('copy');
+        showToastMessage("進度金鑰已複製到剪貼簿 📋");
+      });
+
+      // Import Key
+      btnImportKey.addEventListener("click", () => {
+        const inputVal = importKeyInput.value.trim();
+        if (inputVal) {
+          importKey(inputVal);
+        }
+      });
+
+      // Info / Recipe Modal
+      btnInfo.addEventListener("click", () => {
+        populateRecipeBook();
+        infoModal.classList.remove("hidden");
+      });
+
+      btnCloseInfo.addEventListener("click", () => {
+        infoModal.classList.add("hidden");
+      });
+
+      // Close modal on background click
+      saveModal.addEventListener("click", (e) => {
+        if (e.target === saveModal) saveModal.classList.add("hidden");
+      });
+      infoModal.addEventListener("click", (e) => {
+        if (e.target === infoModal) infoModal.classList.add("hidden");
+      });
+    }
+
+    // Start everything
+    window.onload = function() {
+      // 強制關閉 dark mode，保持白主題
+      document.documentElement.classList.remove('dark');
+      loadProgress();
+      renderSidebarElements();
+      setupEventListeners();
+      lucide.createIcons();
+    };
+  </script>
+</body>
+</html>
