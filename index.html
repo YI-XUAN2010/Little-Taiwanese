@@ -11,18 +11,18 @@
   <style>
     /* Custom Scrollbar */
     ::-webkit-scrollbar {
-      width: 4px;
-      height: 4px;
+      width: 6px;
+      height: 6px;
     }
     ::-webkit-scrollbar-track {
       background: rgba(0, 0, 0, 0.05);
     }
     ::-webkit-scrollbar-thumb {
-      background: rgba(0, 0, 0, 0.15);
+      background: rgba(0, 0, 0, 0.2);
       border-radius: 4px;
     }
     ::-webkit-scrollbar-thumb:hover {
-      background: rgba(0, 0, 0, 0.25);
+      background: rgba(0, 0, 0, 0.3);
     }
     
     /* Grid Pattern Background */
@@ -54,6 +54,15 @@
       -webkit-user-select: none;
     }
 
+    /* Hide scrollbars for utility classes */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
     /* Custom classes for mobile 55% / 45% vertical split layout exactly */
     @media (max-width: 640px) {
       .mobile-canvas {
@@ -71,7 +80,7 @@
 
   <header class="bg-white dark:bg-stone-800 border-b border-stone-200 dark:border-stone-700 px-3 py-2 sm:px-4 sm:py-3 flex items-center justify-between z-10 shrink-0">
     <div class="flex items-center gap-2 sm:gap-3">
-      <!-- 經典台灣茄芷袋配色小 Icon -->
+      <!-- 經典台灣茄汁袋配色小 Icon -->
       <div class="flex h-7 w-9 sm:h-8 sm:w-10 rounded overflow-hidden shadow-sm border border-stone-300/40 shrink-0">
         <div class="w-1/3 bg-emerald-600"></div>
         <div class="w-1/3 bg-red-500"></div>
@@ -110,7 +119,8 @@
   </div>
 
   <!-- Game Container (Desktop: Row, Mobile: Column) -->
-  <div class="flex-1 flex flex-col sm:flex-row overflow-hidden relative">
+  <!-- 加上 h-0 強制限制 Flexbox 剩餘空間高度，使子元素 overflow-y-auto 正常作用 -->
+  <div class="flex-1 h-0 flex flex-col sm:flex-row overflow-hidden relative">
     
     <!-- Left/Top Workspace (Canvas) -->
     <div id="workspace" class="mobile-canvas sm:flex-1 sm:h-full relative grid-bg overflow-hidden cursor-crosshair bg-stone-50 dark:bg-stone-950">
@@ -123,8 +133,9 @@
     </div>
 
     <!-- Right/Bottom Sidebar (Elements List) -->
-    <aside class="mobile-elements w-full sm:w-72 md:w-80 sm:h-full border-t sm:border-t-0 sm:border-l border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 flex flex-col shrink-0 z-10 shadow-lg">
-      <!-- Search & Categories -->
+    <!-- 加上 overflow-hidden 與 flex-col，使子元素 elements-list 滾動得以生效 -->
+    <aside class="mobile-elements w-full sm:w-72 md:w-80 sm:h-full border-t sm:border-t-0 sm:border-l border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 flex flex-col shrink-0 z-10 shadow-lg overflow-hidden">
+      <!-- Search & Categories (固定高度，不隨滾動收縮) -->
       <div class="p-2 sm:p-3 border-b border-stone-200 dark:border-stone-800 space-y-1.5 sm:space-y-2 shrink-0 bg-stone-50/50 dark:bg-stone-900/50">
         <div class="relative">
           <span class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-stone-400">
@@ -143,8 +154,8 @@
         </div>
       </div>
 
-      <!-- Elements List Container -->
-      <div id="elements-list" class="flex-1 overflow-y-auto p-2 grid grid-cols-3 xs:grid-cols-4 sm:grid-cols-2 gap-1.5 content-start">
+      <!-- Elements List Container (加上 min-h-0 以支援 flex 容器中的滾動溢出) -->
+      <div id="elements-list" class="flex-1 overflow-y-auto min-h-0 p-2 grid grid-cols-3 xs:grid-cols-4 sm:grid-cols-2 gap-1.5 content-start">
         <!-- Elements injected here -->
       </div>
     </aside>
